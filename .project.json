@@ -1,0 +1,20 @@
+[
+   {
+      "url": "https://github.com/gbpoole/gbpTodoist"
+   },  
+   {
+      "author": "Gregory B. Poole"
+   },
+   {
+      "name": "gbpTodoist"
+   },
+   {
+      "author_email": "gbpoole@gmail.com"
+   },
+   {
+      "license": "MIT"
+   },
+   {
+      "description": "Assorted Python code for managing Todoist accounts"
+   }
+]

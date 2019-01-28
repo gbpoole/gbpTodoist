@@ -1,0 +1,39 @@
+# Build products
+*.o
+*.a
+
+# Some annoying Apple stuff
+.DS_Store
+*.dSYM
+
+# Python stuff
+*.pyc
+*.egg
+*.eggs
+*.egg-info
+__pycache__
+.pytest_cache
+.src
+
+# JetBrains stuff
+.idea
+
+# .vi swap files
+*.*.swp
+
+# cmake stuff
+.cmake-tmp*
+
+# Common names for out-of-source build directories
+cmake-build-*
+build-*
+build
+_build
+
+# Scratch directories/files
+.tests
+.project_aux.json
+
+#Miscillaneous
+.install*
+*.old
