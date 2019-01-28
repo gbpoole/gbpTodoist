@@ -17,8 +17,8 @@ package_name = os.path.basename(package_root_dir)
 sys.path.insert(0, package_parent_dir)
 
 # Import needed internal modules
+pkg = importlib.import_module(package_name)
 prj = importlib.import_module(package_name + '._internal.project')
-
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
@@ -26,9 +26,9 @@ bullet_list = ['-','#','+']
 
 def print_children_recursive(object,level,bullet_level,key='name'):
     if(key=='name'):
-        print(level*'   '+object.data[key])
+        pkg.log.comment(level*'   '+object.data[key])
     else:
-        print(level*'   '+bullet_list[-bullet_level]+' '+object.data[key])
+        pkg.log.comment(level*'   '+bullet_list[-bullet_level]+' '+object.data[key])
     if hasattr(object,'tasks'):
         print_tree_recursive(object.tasks,level+1,0,key='content')
     for child in object.children:
@@ -71,7 +71,11 @@ def map_tasks_to_projects(projects,tasks):
                 candidate.tasks.append(task)
                 break
 
-def build_state_tree(api,projects,tasks):
+def build_state_tree(api):
+
+    projects = api.state['projects']
+    tasks = api.state['items']
+
     # Build project tree
     build_object_tree(projects)
 
@@ -80,21 +84,22 @@ def build_state_tree(api,projects,tasks):
 
     ###########################################
     #if bad_list:
-    #    print('Identified the following bad tasks:')
+    #    pkg.log.open('Identified the following bad tasks:')
     #    bad_ids_list = []
     #    for bad_item in bad_list:
-    #        print('   '+str(bad_item.data))
+    #        pkg.log.comment('   '+str(bad_item.data))
     #        bad_ids_list.append(bad_item.data['kwargs']['id'])
     #    try:
-    #        print('Deleting...',end='')
+    #        pkg.log.comment('Deleting...')
     #        task_manager = todoist.managers.items.ItemsManager(api)
     #        task_manager.delete(bad_ids_list)
     #        api.commit()
     #    except Exception as e:
-    #        print('failed with the following return: '+str(e))
+    #        pkg.log.comment('failed with the following return: '+str(e))
     #        raise
     #    else:
-    #        print('Done.')
+    #        pkg.log.comment('Done.')
+    #    pkg.log.close(None)
     ###########################################
 
     # Map tasks to their projects
@@ -114,14 +119,14 @@ def find_template_tasks(projects):
     return template_list
 
 def populate_template_task_recursive(task_manager,subtask_add,task_target):
-    print(subtask_add.data['content']+' -> '+task_target.data['content']+' ... ',end='')
+    pkg.log.open(subtask_add.data['content']+' -> '+task_target.data['content']+' ... ')
 
     # Check if subtask is already there
     parent_add = None
     for child in task_target.children:
         if subtask_add.data['content']==child.data['content']:
             parent_add = child 
-            print("not added (already present).")
+            pkg.log.close("not added (already present).")
 
     # Create new task
     if not parent_add:
@@ -130,42 +135,49 @@ def populate_template_task_recursive(task_manager,subtask_add,task_target):
         for key in key_list:
             if key in subtask_add.data:
                 kwargs_item[key]=subtask_add.data[key]
-        #print(task_target.data)
         kwargs_item['item_order']=task_target.data['item_order']
         kwargs_item['indent']=task_target.data['indent']+1
         kwargs_item['parent_id']=task_target.data['id']
         try:
             parent_add = task_manager.add(subtask_add.data['content'],task_target.data['project_id'],**kwargs_item)
         except Exception as e:
-            print('failed with the following return: '+str(e))
+            pkg.log.close('failed with the following return: '+str(e))
             raise
         task_target.children.append(parent_add)
         parent_add.parent=task_target
         parent_add.children=[]
-        print("added.")
+        pkg.log.close("added.")
 
     # Recurse through subtasks
     for child in subtask_add.children:
         populate_template_task_recursive(task_manager,child,parent_add)
 
-def populate_template_tasks(api,template_list):
-    try:
-        task_manager = todoist.managers.items.ItemsManager(api)
-    except Exception as e:
-        print('failed with the following return: '+str(e))
-        raise
+def populate_template_subtasks(api,template_list,debug=False):
+    pkg.log.open('Populate template subtasks...')
+    if not debug:
+        try:
+            task_manager = todoist.managers.items.ItemsManager(api)
+        except Exception as e:
+            pkg.log.close('failed with the following return: '+str(e))
+            raise
+    else:
+        task_manager = None
+        pkg.log.comment('*** Debug mode is ON ***')
     for item in template_list:
         for subtask_template in item['task_template'].children:
             populate_template_task_recursive(task_manager,subtask_template,item['task_target'])
-    try:
-        api.commit()
-    except Exception as e:
-        print('failed with the following return: '+str(e))
-        raise
+    if not debug:
+        try:
+            api.commit()
+        except Exception as e:
+            pkg.log.close('failed with the following return: '+str(e))
+            raise
+    pkg.log.close('Done.')
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.option('-k', '--key', 'API_key', help="User's Todoist API Key", type=str, default=None)
-def gbpTodoist(API_key):
+@click.option('-d','--debug/--no-debug', default=False, show_default=True, help='Debug mode? (no writing; dry-run only)')
+def gbpTodoist(API_key,debug):
     """Perform Todoist processing.
 
     :return: None
@@ -175,15 +187,10 @@ def gbpTodoist(API_key):
     api.sync()
 
     # Build project and task trees
-    build_state_tree(api,api.state['projects'],api.state['items'])
-
-    # Print tree
-    print("Original tree:")
-    print_tree_recursive(api.state['projects'])
+    build_state_tree(api)
 
     # Find and populate template tasks
-    print("Copying tasks:")
-    populate_template_tasks(api,find_template_tasks(api.state['projects']))
+    populate_template_subtasks(api,find_template_tasks(api.state['projects']),debug=debug)
 
 # Permit script execution
 if __name__ == '__main__':
