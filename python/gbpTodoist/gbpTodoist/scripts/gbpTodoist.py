@@ -7,7 +7,6 @@ import click
 import todoist
 
 # Infer the name of this package from the path of __file__
-
 package_parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 package_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 package_name = os.path.basename(package_root_dir)
@@ -69,22 +68,20 @@ class task_tree(object):
                     candidate.tasks.append(task)
                     break
 
-    @staticmethod
-    def print_children_recursive(item,level,bullet_level,key='name'):
+    def _print_children_recursive(self,item,level,bullet_level,key='name'):
         if(key=='name'):
             pkg.log.comment(level*'   '+item.data[key])
         else:
             pkg.log.comment(level*'   '+bullet_list[-bullet_level]+' '+item.data[key])
         if hasattr(item,'tasks'):
-            self.print_tree_recursive(item.tasks,level+1,0,key='content')
+            self._print_tree_recursive(item.tasks,level+1,0,key='content')
         for child in item.children:
-            self.print_children_recursive(child,level+1,bullet_level+1,key=key)
+            self._print_children_recursive(child,level+1,bullet_level+1,key=key)
     
-    @staticmethod
-    def print_tree_recursive(items,level=0,bullet_level=0,key='name'):
+    def _print_tree_recursive(self,items,level=0,bullet_level=0,key='name'):
         for item in items:
             if not item.parent:
-                self.print_children_recursive(item,level,bullet_level,key=key)
+                self._print_children_recursive(item,level,bullet_level,key=key)
     
     @staticmethod
     def build_tree(items):
@@ -113,7 +110,7 @@ class task_tree(object):
         # Check if subtask is already there
         parent_add = None
         for child in task_target.children:
-            if subtask_add.data['content']==child.data['content']:
+            if subtask_add.data['content']==child.data['content'] and not (child.data['checked'] or child.data['is_archived']):
                 parent_add = child 
                 pkg.log.close("not added (already present).")
     
@@ -153,6 +150,9 @@ class task_tree(object):
                                 template_list.append({'content':task_template.data['content'],'project_template':project,'project_target':parent,'task_template':task_template,'task_target':task_parent})
     
         return template_list
+
+    def print_tree(self):
+        self._print_tree_recursive(self.projects)
 
     def populate_template_subtasks(self,debug=False):
         pkg.log.open('Populate template subtasks...')
@@ -195,6 +195,7 @@ def gbpTodoist(API_key,debug):
 
     # Find and populate template tasks
     tree.populate_template_subtasks(debug=debug)
+    #tree.print_tree()
 
 # Permit script execution
 if __name__ == '__main__':
